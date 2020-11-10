@@ -127,8 +127,11 @@ def writelog(err_class, err_pos, err_text, err_category="SYSTEM"):
 
 
 def writelogp(err_class, err_pos, err_text, err_category="SYSTEM"):
+    # Get actual DateTime
+    act_time = datetime.now().strftime("%d.%m.%Y - %H:%M:%S:%f")
+
     writelog(err_class, err_pos, err_text, err_category)
-    print(stringfromerrclass(err_class) + " : " + err_pos + " : " + err_text)
+    print(err_category + " : " + act_time + " : " + stringfromerrclass(err_class) + " : " + err_pos + " : " + err_text)
 
 
 # ---------------------------------------------------
@@ -239,7 +242,6 @@ def on_message(client, userdata, msg):
     elif msg.topic.find("LIFE") != -1:
         json_data = json.loads(msg.payload)
         writelogp(ErrClass.INFO, frmNam + subNam, "LIFE Received from " + json_data["UUID"], "MQTT")
-        print("LIFE Received from " + json_data["UUID"])
 
         # Checks if there is already a Signal with this ID
         # mydb = mysql.connector.connect(host="localhost",user="railway",passwd="123",database="railway")
@@ -263,20 +265,17 @@ def on_message(client, userdata, msg):
 # Reacts on connecting to Broker - Subscribe Topics
 # ---------------------------------------------------
 def on_connect(client, userdata, flags, rc):
-    print("Connected to Broker with result code " + str(rc))
     writelogp(ErrClass.INFO, frmNam + subNam, "Connected successful to Broker")
 
     # Subscribe Topics
-    client.subscribe(MQTT_TOPIC + "/" + SYSTEMNAME + "/status/#")
-    # TODO: Only for Alpha Test
-    client.subscribe("MANNHEIM01/SIGNAL001/STATUS")
+    client.subscribe(MQTT_TOPIC + "/" + SYSTEMNAME + "/STATUS/#")
 
 
 # ---------------------------------------------------
 # Reads Pending Commands from the DB and sends them to Broker and delete it from DB
 # ---------------------------------------------------
 def checkcommand():
-    print("checkcommand")
+    pass
     # TODO: replace with PG SQL
     # mycursor.execute("SELECT * FROM command")
     # myresult = mycursor.fetchone()
@@ -312,6 +311,23 @@ def sendmqtt(topic, qos, payload, retain):
 def sendalive():
     json_data = '{\n"alive": "TRUE"\n}'
     sendmqtt("alive", 0, json_data, False)
+
+def write_elements_to_disk():
+    for x in RailWayElements:
+        file = open("elementState/" + RailWayElements[x].UUID + ".txt", "w+")
+
+        tmpstring = "UUID: " + RailWayElements[x].UUID + "\n"
+        tmpstring = tmpstring + "NAME: " + RailWayElements[x].NAME + "\n"
+        tmpstring = tmpstring + "TYPE: " + RailWayElements[x].TYPE + "\n"
+        tmpstring = tmpstring + "LAST_SEEN: " + RailWayElements[x].LAST_SEEN + "\n"
+        tmpstring = tmpstring + "IP: " + RailWayElements[x].IP + "\n"
+        tmpstring = tmpstring + "LED_FRONT: " + RailWayElements[x].LED_FRONT + "\n"
+        tmpstring = tmpstring + "LED_BACK: " + RailWayElements[x].LED_BACK + "\n"
+        tmpstring = tmpstring + "WIFI_LEVEL: " + RailWayElements[x].WIFI_LEVEL + " dBm\n"
+        tmpstring = tmpstring + "U_BAT: " + RailWayElements[x].U_BAT + " V\n"
+        tmpstring = tmpstring + "TEMP: " + RailWayElements[x].TEMP + " °C"
+        file.write(tmpstring)
+        file.close()
 
 
 # ---------------------------------------------------
@@ -349,6 +365,9 @@ while True:
         if not client.is_connected():  # Reconnect to Broker if connection is lost
             writelogp(ErrClass.ERROR, frmNam + subNam, "Lost MQTT connection, try to reconnect")
             connectToBroker()
+
+        write_elements_to_disk()
+
         TIMER5S = 5000
 
     TIMER100MS = TIMER100MS - TIMERTIMEMS
